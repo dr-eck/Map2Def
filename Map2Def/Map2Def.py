@@ -1,3 +1,4 @@
+import os
 import re
 
 def extract_function_names(proj_path):
@@ -30,7 +31,7 @@ def extract_function_names(proj_path):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-        # Sort the function names alphabetically
+    # Sort the function names alphabetically
     function_names.sort()
 
     return function_names
@@ -98,13 +99,8 @@ if __name__ == "__main__":
     # Default the project name to the solution name if the user hits Enter
     if not project_name:
         proj_name = sln_name
-
-    # Prompt the user for the .idl file name
-    idl_fname = input("Enter the .idl file name (with or without the .idl extension): ").strip()
-
-    # Ensure the file name ends with .idl
-    if not idl_fname.endswith(".idl"):
-        idl_fname += ".idl"
+    else:
+        proj_name = project_name
 
     # Define the path to the solution file
     sln_path = "C:\\Users\\dreck\\Source\\Repos\\" + sln_name + "\\"
@@ -112,44 +108,43 @@ if __name__ == "__main__":
     # Create the full path to the project files
     proj_path = sln_path + proj_name + "\\"
 
-    # Print the filename for confirmation
-    print(f"Processing idl file: {idl_fname}")
+    # Scan the proj_path for .idl files
+    idl_files = [f for f in os.listdir(proj_path) if f.endswith(".idl")]
 
-    # Call the function to extract function names
-    functions = extract_function_names(proj_path + idl_fname)
-    print("Extracted function names:")
-    for func in functions:
-        print(func)
+    if not idl_files:
+        print(f"No .idl files found in {proj_path}")
+        exit(1)
 
     # Create the map file name
     map_fname = sln_name + ".map"
 
     # Create the full path to the .map file
-    map_file_path = sln_path + "x64\Debug\\" + sln_name + "\\" + map_fname
+    map_file_path = sln_path + "x64\\Debug\\" + sln_name + "\\" + map_fname
 
     # Print the filename for confirmation
     print(f"Processing map file: {map_fname}")
-
-    # Extract the file name without the .idl extension
-    fname = idl_fname[:-4]
-
-    decorated_functions = find_decorated_function_names(map_file_path, functions, fname, sln_name)
-    print("Decorated function names:")
-    unique_decorated_names = set()  # Use a set to store unique names
-    for func, decorated in decorated_functions.items():
-        unique_decorated_names.update(decorated)  # Add all decorated names to the set
 
     # Create the .def file content
     def_file_content = []
     def_file_content.append(f"LIBRARY   {sln_name.upper()}")
     def_file_content.append("EXPORTS")
-    for name in sorted(unique_decorated_names):  # Sort for consistent output
-        def_file_content.append(f"  {name}")
 
-    # Print the .def file content to the display
-    print("\n".join(def_file_content))
+    # Process each .idl file
+    for idl_file in idl_files:
+        print(f"Processing idl file: {idl_file}")
+        fname = idl_file[:-4]  # Extract the file name without the .idl extension
+        functions = extract_function_names(proj_path + idl_file)
+        decorated_functions = find_decorated_function_names(map_file_path, functions, fname, sln_name)
 
-        # Save the .def file in the proj_path
+        # Add decorated function names grouped by .idl file
+        def_file_content.append(f"; Functions from {idl_file}")
+        unique_decorated_names = set()
+        for func, decorated in decorated_functions.items():
+            unique_decorated_names.update(decorated)
+        for name in sorted(unique_decorated_names):
+            def_file_content.append(f"  {name}")
+
+    # Save the .def file in the proj_path
     def_file_path = proj_path + proj_name + ".def"
     with open(def_file_path, "w") as def_file:
         def_file.write("\n".join(def_file_content))
