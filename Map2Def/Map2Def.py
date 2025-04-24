@@ -1,11 +1,11 @@
 import re
 
-def extract_function_names(idl_file_path):
+def extract_function_names(proj_path):
     """
     Reads a .idl file and extracts function names.
 
     Args:
-        idl_file_path (str): The path to the .idl file.
+        proj_path (str): The path to the .idl file.
 
     Returns:
         list: A list of function names found in the .idl file.
@@ -16,7 +16,7 @@ def extract_function_names(idl_file_path):
     function_pattern = re.compile(r'\b[a-zA-Z_][a-zA-Z0-9_]*\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(.*?\)\s*;')
 
     try:
-        with open(idl_file_path, 'r') as file:
+        with open(proj_path, 'r') as file:
             for line in file:
                 # Search for function definitions in the line
                 match = function_pattern.search(line)
@@ -26,7 +26,7 @@ def extract_function_names(idl_file_path):
                     function_name = function_signature.split('(')[0].split()[-1]
                     function_names.append(function_name)
     except FileNotFoundError:
-        print(f"Error: File not found at {idl_file_path}")
+        print(f"Error: File not found at {proj_path}")
     except Exception as e:
         print(f"An error occurred: {e}")
 
@@ -35,7 +35,7 @@ def extract_function_names(idl_file_path):
 
     return function_names
 
-def find_decorated_function_names(map_file_path, function_names, fname, solution_name):
+def find_decorated_function_names(map_file_path, function_names, fname, sln_name):
     """
     Finds the decorated function names for each function in the list from the .map file.
 
@@ -43,7 +43,7 @@ def find_decorated_function_names(map_file_path, function_names, fname, solution
         map_file_path (str): The path to the .map file.
         function_names (list): A list of function names to search for.
         fname (str): The file name without the .idl extension.
-        solution_name (str): The solution name.
+        sln_name (str): The solution name.
 
     Returns:
         dict: A dictionary mapping function names to a list of their decorated names.
@@ -58,7 +58,7 @@ def find_decorated_function_names(map_file_path, function_names, fname, solution
                 # Create the regex pattern for the current function
                 pattern_template = (
                     r'\?' + re.escape(func_name) + r'@' + re.escape(fname) +
-                    r'@implementation@' + re.escape(solution_name) + r'@winrt@@.*?@Z'
+                    r'@implementation@' + re.escape(sln_name) + r'@winrt@@.*?@Z'
                 )
                 pattern = re.compile(pattern_template)
 
@@ -87,13 +87,17 @@ def find_decorated_function_names(map_file_path, function_names, fname, solution
 
 # Example usage
 if __name__ == "__main__":
-    # Prompt the user for the Solution name (assuming it's the same as the project name)
-    solution_name = input("Enter the Solution name (without .sln extension): ").strip()
+    # Prompt the user for the Solution name
+    sln_name = input("Enter the Solution name (without .sln extension): ").strip()
     # Ensure the solution name does not end with .sln
-    if solution_name.endswith(".sln"):
-        solution_name = solution_name[:-4]
-    # Define the path to the .idl file
-    sln_path = "C:\\Users\\dreck\\Source\\Repos\\" + solution_name + "\\"
+    if sln_name.endswith(".sln"):
+        sln_name = sln_name[:-4]
+
+    # Prompt the user for the Project name
+    project_name = input("Enter the Project name (press Enter to use the Solution name): ").strip()
+    # Default the project name to the solution name if the user hits Enter
+    if not project_name:
+        proj_name = sln_name
 
     # Prompt the user for the .idl file name
     idl_fname = input("Enter the .idl file name (with or without the .idl extension): ").strip()
@@ -102,31 +106,39 @@ if __name__ == "__main__":
     if not idl_fname.endswith(".idl"):
         idl_fname += ".idl"
 
-    # Extract the file name without the .idl extension
-    fname = idl_fname[:-4]
+    # Define the path to the solution file
+    sln_path = "C:\\Users\\dreck\\Source\\Repos\\" + sln_name + "\\"
 
-    # Create the full path to the .idl file
-    idl_file_path = sln_path + solution_name + "\\" + idl_fname
+    # Create the full path to the project files
+    proj_path = sln_path + proj_name + "\\" + idl_fname
 
     # Print the filename for confirmation
     print(f"Processing idl file: {idl_fname}")
 
     # Call the function to extract function names
-    functions = extract_function_names(idl_file_path)
+    functions = extract_function_names(proj_path)
     print("Extracted function names:")
     for func in functions:
         print(func)
 
     # Create the map file name
-    map_fname = solution_name + ".map"
+    map_fname = sln_name + ".map"
 
     # Create the full path to the .map file
-    map_file_path = sln_path + "x64\Debug\\" + solution_name + "\\" + map_fname
+    map_file_path = sln_path + "x64\Debug\\" + sln_name + "\\" + map_fname
 
     # Print the filename for confirmation
     print(f"Processing map file: {map_fname}")
 
-    decorated_functions = find_decorated_function_names(map_file_path, functions, fname, solution_name)
+    # Extract the file name without the .idl extension
+    fname = idl_fname[:-4]
+
+    decorated_functions = find_decorated_function_names(map_file_path, functions, fname, sln_name)
     print("Decorated function names:")
+    unique_decorated_names = set()  # Use a set to store unique names
     for func, decorated in decorated_functions.items():
-        print(f"{func}: {decorated}")
+        unique_decorated_names.update(decorated)  # Add all decorated names to the set
+
+    # Print each unique decorated name
+    for name in sorted(unique_decorated_names):  # Sort for consistent output
+        print(name)
