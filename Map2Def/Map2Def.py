@@ -110,13 +110,13 @@ if __name__ == "__main__":
     sln_path = "C:\\Users\\dreck\\Source\\Repos\\" + sln_name + "\\"
 
     # Create the full path to the project files
-    proj_path = sln_path + proj_name + "\\" + idl_fname
+    proj_path = sln_path + proj_name + "\\"
 
     # Print the filename for confirmation
     print(f"Processing idl file: {idl_fname}")
 
     # Call the function to extract function names
-    functions = extract_function_names(proj_path)
+    functions = extract_function_names(proj_path + idl_fname)
     print("Extracted function names:")
     for func in functions:
         print(func)
@@ -139,6 +139,20 @@ if __name__ == "__main__":
     for func, decorated in decorated_functions.items():
         unique_decorated_names.update(decorated)  # Add all decorated names to the set
 
-    # Print each unique decorated name
+    # Create the .def file content
+    def_file_content = []
+    def_file_content.append(f"LIBRARY   {sln_name.upper()}")
+    def_file_content.append("EXPORTS")
     for name in sorted(unique_decorated_names):  # Sort for consistent output
-        print(name)
+        def_file_content.append(f"  {name}")
+
+    # Print the .def file content to the display
+    print("\n".join(def_file_content))
+
+        # Save the .def file in the proj_path
+    def_file_path = proj_path + proj_name + ".def"
+    with open(def_file_path, "w") as def_file:
+        def_file.write("\n".join(def_file_content))
+
+    # Print confirmation of the saved file
+    print(f".def file saved at: {def_file_path}")
