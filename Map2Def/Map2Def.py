@@ -1,49 +1,62 @@
 import os
 import re
 
-def extract_function_names(proj_path):
-    """
-    Reads a .idl file and extracts function names.
-
-    Args:
-        proj_path (str): The path to the .idl file.
-
-    Returns:
-        list: A list of function names found in the .idl file.
-    """
-    function_names = []
-
-    # Regular expression to match function definitions
-    function_pattern = re.compile(r'\b[a-zA-Z_][a-zA-Z0-9_]*\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(.*?\)\s*;')
+def extract_runtimeclass_functions(proj_path):
+    runtimeclass_functions = {}
+    runtimeclass_pattern = re.compile(r'^\s*runtimeclass\s+([a-zA-Z_][a-zA-Z0-9_]*)')
+    #function_pattern = re.compile(r'^\s*(?:static\s+)?(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(')
+    function_pattern = re.compile(r'^\s*(?:static\s+)?(?:[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(.*?\)\s*;')
 
     try:
         with open(proj_path, 'r') as file:
+            current_runtimeclass = None
+            inside_runtimeclass = False
             for line in file:
-                # Search for function definitions in the line
-                match = function_pattern.search(line)
-                if match:
-                    # Extract the function name
-                    function_signature = match.group()
-                    function_name = function_signature.split('(')[0].split()[-1]
-                    function_names.append(function_name)
+                # print(f"Processing line: {line.strip()}")  # Debugging output
+
+                # Check for the start of a runtimeclass block
+                runtimeclass_match = runtimeclass_pattern.match(line)
+                if runtimeclass_match:
+                    current_runtimeclass = runtimeclass_match.group(1)
+                    runtimeclass_functions[current_runtimeclass] = []
+                    inside_runtimeclass = True
+                    print(f"Found runtimeclass: {current_runtimeclass}")  # Debugging output
+                    continue
+
+                # Check for the end of a runtimeclass block
+                if inside_runtimeclass and re.match(r'^\s*}\s*$', line):
+                    inside_runtimeclass = False
+                    current_runtimeclass = None
+                    print("End of runtimeclass block")  # Debugging output
+                    continue
+
+                # If inside a runtimeclass block, look for function definitions
+                if inside_runtimeclass and current_runtimeclass:
+                    function_match = function_pattern.match(line)
+                    if function_match:
+                        function_name = function_match.group(1)
+                        runtimeclass_functions[current_runtimeclass].append(function_name)
+                        print(f"Found function: {function_name}")  # Debugging output
+
+            # Sort the functions for each runtimeclass
+        for runtimeclass in runtimeclass_functions:
+            runtimeclass_functions[runtimeclass].sort()
+
     except FileNotFoundError:
         print(f"Error: File not found at {proj_path}")
     except Exception as e:
         print(f"An error occurred: {e}")
 
-    # Sort the function names alphabetically
-    function_names.sort()
+    return runtimeclass_functions
 
-    return function_names
-
-def find_decorated_function_names(map_file_path, function_names, fname, sln_name):
+def find_decorated_function_names(map_file_path, runtimeclass_functions, runtimeclass_name, sln_name):
     """
     Finds the decorated function names for each function in the list from the .map file.
 
     Args:
         map_file_path (str): The path to the .map file.
-        function_names (list): A list of function names to search for.
-        fname (str): The file name without the .idl extension.
+        runtimeclass_functions (list): A list of function names to search for.
+        runtimeclass_name (str): The name of the runtimeclass.
         sln_name (str): The solution name.
 
     Returns:
@@ -55,13 +68,18 @@ def find_decorated_function_names(map_file_path, function_names, fname, sln_name
             lines = file.readlines()
             line_index = 0
 
-            for func_name in function_names:
+            for func_name in runtimeclass_functions:
+                # Debug: Print the function name being processed
+                print(f"Searching for function: {func_name}")
                 # Create the regex pattern for the current function
                 pattern_template = (
-                    r'\?' + re.escape(func_name) + r'@' + re.escape(fname) +
-                    r'@implementation@' + re.escape(sln_name) + r'@winrt@@.*?@Z'
+                    r'\?' + re.escape(func_name) + r'@' + re.escape(runtimeclass_name) +
+                    r'@implementation@' + re.escape(sln_name) + r'@winrt@@.*?Z '
                 )
                 pattern = re.compile(pattern_template)
+
+                # Debug: Print the regex pattern being used
+                # print(f"Searching for pattern: {pattern.pattern}")
 
                 # Start scanning from the current position in the file
                 decorated_list = []
@@ -69,6 +87,8 @@ def find_decorated_function_names(map_file_path, function_names, fname, sln_name
                     line = lines[i]
                     match = pattern.search(line)
                     if match:
+                        # Debug: Print the match found
+                        print(f"Match found: {match.group()}")
                         # Store the decorated name
                         decorated_list.append(match.group())
                         line_index = i + 1  # Move to the next line for subsequent matches
@@ -88,6 +108,23 @@ def find_decorated_function_names(map_file_path, function_names, fname, sln_name
 
 # Example usage
 if __name__ == "__main__":
+    # # Define the path to the .idl file
+    # idl_file_path = "C:/Users/dreck/Source/Repos/ImgUtilsX/ImgUtilsX/IMan.idl"
+
+    # # Extract runtimeclass functions
+    # runtimeclass_functions = extract_runtimeclass_functions(idl_file_path)
+
+    # print(f"Extracted functions from {idl_file_path}:")
+
+    # # print the number of runtimeclasses found
+    # print(f"Number of runtimeclasses found: {len(runtimeclass_functions)}")
+
+    # # Print the extracted functions
+    # for runtimeclass, functions in runtimeclass_functions.items():
+    #     print(f"Runtimeclass: {runtimeclass}")
+    #     for func in functions:
+    #         print(f"  {func}")
+
     # Prompt the user for the Solution name
     sln_name = input("Enter the Solution name (without .sln extension): ").strip()
     # Ensure the solution name does not end with .sln
@@ -132,17 +169,18 @@ if __name__ == "__main__":
     # Process each .idl file
     for idl_file in idl_files:
         print(f"Processing idl file: {idl_file}")
-        fname = idl_file[:-4]  # Extract the file name without the .idl extension
-        functions = extract_function_names(proj_path + idl_file)
-        decorated_functions = find_decorated_function_names(map_file_path, functions, fname, sln_name)
+        runtimeclass_functions = extract_runtimeclass_functions(proj_path + idl_file)
 
-        # Add decorated function names grouped by .idl file
-        def_file_content.append(f"; Functions from {idl_file}")
-        unique_decorated_names = set()
-        for func, decorated in decorated_functions.items():
-            unique_decorated_names.update(decorated)
-        for name in sorted(unique_decorated_names):
-            def_file_content.append(f"  {name}")
+        for runtimeclass_name, functions in runtimeclass_functions.items():
+            decorated_functions = find_decorated_function_names(map_file_path, functions, runtimeclass_name, sln_name)
+
+            # Add decorated function names grouped by runtimeclass
+            def_file_content.append(f"; Functions from runtimeclass {runtimeclass_name}")
+            unique_decorated_names = set()
+            for func, decorated in decorated_functions.items():
+                unique_decorated_names.update(decorated)
+            for name in sorted(unique_decorated_names):
+                def_file_content.append(f"  {name}")
 
     # Save the .def file in the proj_path
     def_file_path = proj_path + proj_name + ".def"
